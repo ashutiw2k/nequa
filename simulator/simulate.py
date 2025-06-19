@@ -28,10 +28,21 @@ def get_ideal_prob(input:str, assert_check=True):
 
     return ideal_measurement
 
+def get_soft_ideal_probs(input: str, smoothing: float = 1e-3, assert_check=True):
+    if assert_check:
+        assert all(c in '01' for c in input), f'Input value {input} not a bitstring'
+
+    n = len(input)
+    ideal = torch.full((2**n,), smoothing)
+    target_index = int(input, 2)
+    ideal[target_index] = 1.0 - (2**n - 1) * smoothing
+    return ideal
+
+
 def get_ideal_data(num_qubits:int, measure_counts:int, num_values:int=100, prob_dist=False):
     valid_bitstrings = [''.join(random.choice('01') for _ in range(num_qubits)) for _ in range(num_values)]
     if prob_dist:
-        ideal_data = [(bstring, get_ideal_prob(bstring, assert_check=False)) for bstring in valid_bitstrings]
+        ideal_data = [(bstring, get_soft_ideal_probs(bstring, assert_check=False)) for bstring in valid_bitstrings]
     else:
         ideal_data = [(bstring, get_ideal_shots(bstring, measure_counts, assert_check=False)) for bstring in valid_bitstrings]
 
