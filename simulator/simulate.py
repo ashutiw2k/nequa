@@ -5,9 +5,31 @@ import pennylane as qml
 from qiskit_aer import AerSimulator
 
 
-def _fill_missing_bitstrings(data_dict):
-    n_bits = len(next(iter(data_dict)))  # infer bitstring length
-    all_bitstrings = [format(i, f'0{n_bits}b') for i in range(2 ** n_bits)]
+def _fill_missing_bitstrings(data_dict, n_bits=None):
+    """Return a dictionary containing all bitstrings of a given length.
+
+    Qiskit only returns bitstrings that appear at least once. If ``data_dict``
+    is empty or missing some bitstrings, those entries are filled with zeros.
+
+    Parameters
+    ----------
+    data_dict : dict
+        Dictionary returned by ``qiskit`` with bitstrings as keys.
+    n_bits : int, optional
+        Number of qubits used in the circuit. If ``None`` it will be inferred
+        from ``data_dict``. When ``data_dict`` is empty this parameter is
+        required.
+    """
+
+    if n_bits is None:
+        try:
+            n_bits = len(next(iter(data_dict)))
+        except StopIteration:
+            raise ValueError(
+                "Unable to infer bitstring length from empty data_dict."
+            )
+
+    all_bitstrings = [format(i, f"0{n_bits}b") for i in range(2 ** n_bits)]
     return {bit: data_dict.get(bit, 0) for bit in all_bitstrings}
 
 
@@ -49,9 +71,15 @@ def get_ideal_data(num_qubits:int, measure_counts:int, num_values:int=100, prob_
     return ideal_data
 
 
-def run_circuit_sim(circuit:QuantumCircuit, simulator:AerSimulator, num_shots=2**10):
+def run_circuit_sim(circuit: QuantumCircuit, simulator: AerSimulator, num_shots=2**10):
+    """Run ``circuit`` on ``simulator`` and return the counts as a tensor."""
+
     transpiled_circ = transpile(circuit, simulator)
     result = simulator.run(transpiled_circ, shots=num_shots).result()
-    counts = _fill_missing_bitstrings(result.get_counts(transpiled_circ))
-    return torch.tensor([x[1] for x in sorted(counts.items(), key=lambda x:x[0])])
+    counts = _fill_missing_bitstrings(
+        result.get_counts(transpiled_circ), n_bits=circuit.num_qubits
+    )
+    return torch.tensor(
+        [x[1] for x in sorted(counts.items(), key=lambda x: x[0])]
+    )
 
