@@ -30,13 +30,13 @@ def _fill_missing_bitstrings(data_dict, n_bits=None):
             )
 
     all_bitstrings = [format(i, f"0{n_bits}b") for i in range(2 ** n_bits)]
-    return {bit: data_dict.get(bit, 0) for bit in all_bitstrings}
+    return {bit: data_dict.get(bit, 1e-8) for bit in all_bitstrings}
 
 
 def get_ideal_shots(input:str, shots:int, assert_check=True):
     if assert_check:
         assert all(c in '01' for c in input), f'Input value {input} not a bitstring'
-    ideal_measurement = torch.zeros(2 ** len(input))
+    ideal_measurement = torch.full((2 ** len(input),), 1e-8)
     ideal_measurement[int(input, 2)] = shots
 
     return ideal_measurement
