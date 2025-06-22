@@ -4,9 +4,9 @@ import torch
 
 import pennylane as qml
 
-from .pqc_circuits import get_simple_PQC_qiskit
+from .pqc_circuits import qiskit_PQC_RZRX
 
-def append_pqc_to_quantum_circuit(circuit:QuantumCircuit, params: torch.Tensor, pqc_func=get_simple_PQC_qiskit):
+def append_pqc_to_quantum_circuit(circuit:QuantumCircuit, params: torch.Tensor, pqc_func=qiskit_PQC_RZRX):
     pqc_circ = pqc_func(circuit.num_qubits, params)
     # print(pqc_circ.draw())
     

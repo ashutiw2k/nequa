@@ -41,6 +41,17 @@ def get_ideal_shots(input:str, shots:int, assert_check=True):
 
     return ideal_measurement
 
+
+def get_soft_ideal_shots(input:str, shots:int, assert_check=True):
+    if assert_check:
+        assert all(c in '01' for c in input), f'Input value {input} not a bitstring'
+    num_vals = 2 ** len(input)
+    ideal_measurement = torch.ones(num_vals)
+    ideal_measurement[int(input, 2)] = shots - ideal_measurement.sum() + 1
+
+    return ideal_measurement
+
+
 def get_ideal_prob(input:str, assert_check=True):
     if assert_check:
         assert all(c in '01' for c in input), f'Input value {input} not a bitstring'
@@ -61,12 +72,18 @@ def get_soft_ideal_prob(input: str, smoothing: float = 1e-3, assert_check=True):
     return ideal
 
 
-def get_ideal_data(num_qubits:int, measure_counts:int, num_values:int=100, prob_dist=False):
+def get_ideal_data(num_qubits:int, measure_counts:int, num_values:int=100, prob_dist=False, get_soft=False):
     valid_bitstrings = [''.join(random.choice('01') for _ in range(num_qubits)) for _ in range(num_values)]
     if prob_dist:
-        ideal_data = [(bstring, get_ideal_prob(bstring, assert_check=False)) for bstring in valid_bitstrings]
+        if get_soft:
+            ideal_data = [(bstring, get_ideal_prob(bstring, assert_check=False)) for bstring in valid_bitstrings]
+        else:
+            ideal_data = [(bstring, get_ideal_prob(bstring, assert_check=False)) for bstring in valid_bitstrings]
     else:
-        ideal_data = [(bstring, get_ideal_shots(bstring, measure_counts, assert_check=False)) for bstring in valid_bitstrings]
+        if get_soft:
+            ideal_data = [(bstring, get_soft_ideal_shots(bstring, measure_counts, assert_check=False)) for bstring in valid_bitstrings]
+        else:
+            ideal_data = [(bstring, get_ideal_shots(bstring, measure_counts, assert_check=False)) for bstring in valid_bitstrings]
 
     return ideal_data
 
