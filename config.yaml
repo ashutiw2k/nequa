@@ -1,0 +1,9 @@
+# Example configuration for training
+model: SimpleQiskitQuantumModel
+num_params: 2
+num_qubits: 3
+num_shots: 1024
+dataset_size: 20
+epochs: 1
+lr: 0.01
+device: cpu
