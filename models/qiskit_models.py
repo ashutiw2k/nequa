@@ -77,7 +77,7 @@ class SimpleQiskitQuantumModel(nn.Module):
                  circuit_runner = run_circuit_sim, pqc_arch_func=qiskit_PQC_RZRX):
         super().__init__()
 
-        self.pqc_params = nn.Parameter(torch.pi * torch.rand(num_params)) # Convert parameters from [0,1) to [0,2\pi)
+        self.pqc_params = nn.Parameter(2 * torch.pi * torch.rand(num_params)) # Convert parameters from [0,1) to [0,2\pi)
         self.simulator = simulator
         self.transpile = transpile
         self.num_shots = num_shots
