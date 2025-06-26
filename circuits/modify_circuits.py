@@ -1,10 +1,13 @@
 import numpy as np
 from qiskit import QuantumCircuit, quantum_info
+from qiskit.circuit.library import RZGate, RXGate
 import torch
+import copy
 
 import pennylane as qml
 
 from .pqc_circuits import qiskit_PQC_RZRX
+from models.noise_models import BitPhaseFlipNoise
 
 def append_pqc_to_quantum_circuit(circuit:QuantumCircuit, params: torch.Tensor, pqc_func=qiskit_PQC_RZRX):
     pqc_circ = pqc_func(circuit.num_qubits, params)
@@ -20,7 +23,7 @@ def append_pqc_to_quantum_circuit(circuit:QuantumCircuit, params: torch.Tensor, 
     return circuit_with_pqc
 
 
-def append_inverse_to_quantum_circuit(circuit:QuantumCircuit, add_measure=False):
+def append_inverse(circuit:QuantumCircuit, add_measure=False):
     circ = circuit.remove_final_measurements(inplace=False)
     circ = circ.compose(circ.inverse())
     
@@ -40,7 +43,7 @@ def get_circuit_for_model(input:str, circuit:QuantumCircuit):
         if b == '1':
             input_circ.x(i)
 
-    model_circ = input_circ.compose(append_inverse_to_quantum_circuit(circuit))
+    model_circ = input_circ.compose(append_inverse(circuit))
 
     return model_circ
 
@@ -54,3 +57,29 @@ def get_unitary_for_model_pennylane(input:str, circuit:QuantumCircuit):
     return model_circuit_unitary
 
 
+def append_custom_noisy_inverse(circuit:QuantumCircuit, noise:BitPhaseFlipNoise=None):
+    inverse_circuit = QuantumCircuit(circuit.num_qubits)
+    circuit_ins = copy.deepcopy(circuit.data)
+    circuit_ins.reverse()
+
+    if noise is None:
+        noise = BitPhaseFlipNoise()
+
+    noise_list_x = iter(np.random.uniform(low=(noise.x_noise - noise.delta_x), 
+                                    high= (noise.x_noise + noise.delta_x),
+                                    size= 2 * len(circuit_ins)))
+    
+    noise_list_z = iter(np.random.uniform(low=(noise.z_noise - noise.delta_z), 
+                                     high= (noise.z_noise + noise.delta_z),
+                                     size= 2 * len(circuit_ins)))
+
+    for ins in circuit_ins:
+        if ins.label is None or 'noise' not in ins.label:
+            inverse_circuit.append(ins)
+            for q in ins.qubits:
+                inverse_circuit.append(RZGate(phi=next(noise_list_z), label='z_noise'), [q])
+                inverse_circuit.append(RXGate(theta=next(noise_list_x), label='x_noise'), [q])
+
+
+    return circuit.compose(inverse_circuit)
+    

@@ -1,8 +1,11 @@
 import random
 import torch
 from qiskit import QuantumCircuit, transpile
-import pennylane as qml
+from qiskit.primitives import Sampler      # Terra ≥ 0.46
+
 from qiskit_aer import AerSimulator
+
+from tqdm import tqdm
 
 
 def _fill_missing_bitstrings(data_dict, n_bits=None):
@@ -36,7 +39,7 @@ def _fill_missing_bitstrings(data_dict, n_bits=None):
 def get_ideal_shots(input:str, shots:int, assert_check=True):
     if assert_check:
         assert all(c in '01' for c in input), f'Input value {input} not a bitstring'
-    ideal_measurement = torch.full((2 ** len(input),), 1e-8)
+    ideal_measurement = torch.full((2 ** len(input),), 1e-10)
     ideal_measurement[int(input, 2)] = shots
 
     return ideal_measurement
@@ -90,7 +93,7 @@ def get_ideal_data(num_qubits:int, measure_counts:int, num_values:int=100, prob_
 
 def run_circuit_sim(circuit: QuantumCircuit, simulator: AerSimulator, num_shots=2**10):
     """Run ``circuit`` on ``simulator`` and return the counts as a tensor."""
-
+    
     transpiled_circ = transpile(circuit, simulator)
     result = simulator.run(transpiled_circ, shots=num_shots).result()
     counts = _fill_missing_bitstrings(
@@ -100,3 +103,41 @@ def run_circuit_sim(circuit: QuantumCircuit, simulator: AerSimulator, num_shots=
         [x[1] for x in sorted(counts.items(), key=lambda x: x[0])]
     )
 
+
+def get_ideal_data_superpos(num_qubits:int, num_shots:int=1024, num_vals:int=1000, prob_dist=False, device='CPU'):
+    ideal_data_list = []
+    # num_qubits = circuit.num_qubits
+    ideal_sim = AerSimulator(device=device)
+    
+    for i in tqdm(range(num_vals), f'Generating Ideal Data'):
+        params = (torch.rand((num_qubits, 2)) * torch.pi * 2).detach().cpu().numpy() # Get random values between 0 and 2pi
+        circ = QuantumCircuit(num_qubits)
+        for i in range(num_qubits):
+            circ.rx(params[i][0], i)
+            circ.rz(params[i][1], i)
+        circ.measure_all()
+
+        # transpiled_circ = transpile(circ, ideal_sim)
+        # result = ideal_sim.run(transpiled_circ, shots=num_shots).result()
+        # counts = result.get_counts(transpiled_circ)
+        # full_counts = _fill_missing_bitstrings(counts, num_qubits)
+        counts = run_circuit_sampler(circ, num_shots)
+        ideal_data_list.append((params, counts))
+
+    return ideal_data_list
+
+def run_circuit_sampler(circuit:QuantumCircuit, shots=2**10):
+    """
+    Run ``circuit`` with Terra’s default Sampler backend (falls back
+    to pure-Python BasicAer if nothing faster is installed) and return
+    a length-2**n tensor of shot counts.
+    """
+    job      = Sampler().run(circuit, shots=shots)   # no transpiler needed
+    qdist    = job.result().quasi_dists[0]             # {bitstring:prob}
+    num_qubits = circuit.num_qubits
+    counts   = torch.tensor(
+        [round(qdist.get(i, 0) * shots)
+         for i in range(2**num_qubits)],
+        dtype=torch.int32,
+    )
+    return counts

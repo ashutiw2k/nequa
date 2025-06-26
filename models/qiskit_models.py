@@ -5,7 +5,7 @@ from qiskit_aer import AerSimulator
 
 from circuits.modify_circuits import append_pqc_to_quantum_circuit
 from circuits.pqc_circuits import qiskit_PQC_RZRX
-from simulator.simulate import run_circuit_sim
+from simulator.simulate import run_circuit_sim, run_circuit_sampler
 
 # Autograd function, should not be needing it 
 # import torch
@@ -72,18 +72,18 @@ from simulator.simulate import run_circuit_sim
 
 
 class SimpleQiskitQuantumModel(nn.Module):
-    def __init__(self, num_params:int, base_circuit: QuantumCircuit, 
+    def __init__(self, num_params:int, 
                  simulator:AerSimulator, num_shots:int, 
-                 circuit_runner = run_circuit_sim, pqc_arch_func=qiskit_PQC_RZRX):
+                 circuit_runner = run_circuit_sampler, pqc_arch_func=qiskit_PQC_RZRX):
         super().__init__()
 
-        self.pqc_params = nn.Parameter(2 * torch.pi * torch.rand(num_params)) # Convert parameters from [0,1) to [0,2\pi)
+        self.pqc_params = nn.Parameter(4*torch.pi + torch.pi*torch.rand(num_params)) # Convert parameters from [0,1) to [4\pi, 5\pi)
         self.simulator = simulator
         self.transpile = transpile
         self.num_shots = num_shots
         self.runner = circuit_runner
-        self.base_circuit = base_circuit
         self.pqc_arch_func = pqc_arch_func
+        self.scale = torch.pi
         pass
 
     
@@ -96,7 +96,7 @@ class SimpleQiskitQuantumModel(nn.Module):
                                                     params=self.pqc_params,
                                                     pqc_func=self.pqc_arch_func)
         
-        measured_tensor = self.runner(circuit_pqc, self.simulator, self.num_shots)
+        measured_tensor = self.runner(circuit_pqc, self.num_shots)
 
         return measured_tensor + (self.pqc_params.sum() * 0.0) # The params.sum is for the required_grad=True error fix. 
 
@@ -104,3 +104,46 @@ class SimpleQiskitQuantumModel(nn.Module):
 
 
         
+class ScaledQiskitQuantumModel(nn.Module):
+    def __init__(self, num_params: int, 
+                 simulator: AerSimulator, 
+                 num_shots: int, 
+                 circuit_runner = run_circuit_sampler, 
+                 pqc_arch_func = qiskit_PQC_RZRX):
+        super().__init__()
+
+        # 🔁 Raw (unconstrained) parameters initialized ~N(0, 1)
+        self.raw_params = nn.Parameter(torch.randn(num_params))  
+
+        # π scaling for tanh-based bounding to [-π, π]
+        self.scale = torch.pi
+
+        # Standard circuit/simulator setup
+        self.simulator = simulator
+        self.transpile = transpile
+        self.num_shots = num_shots
+        self.runner = circuit_runner
+        self.pqc_arch_func = pqc_arch_func
+
+    def forward(self, circuit: QuantumCircuit = None):
+        """
+        @param circuit: The quantum circuit with the input and its inverse appended. 
+        """
+        # ⚠️ Convert raw parameters to bounded range [-π, π]
+        bounded_params = self.scale * torch.tanh(self.raw_params)
+
+        # Remove final measurements (assumed to be appended to input)
+        circ = circuit.remove_final_measurements(inplace=False)
+
+        # Append the PQC block with bounded parameters
+        circuit_pqc = append_pqc_to_quantum_circuit(
+            circuit=circ, 
+            params=bounded_params, 
+            pqc_func=self.pqc_arch_func
+        )
+
+        # Run on simulator and collect measurement counts
+        measured_tensor = self.runner(circuit_pqc, self.num_shots)
+
+        # ⚠️ Add dummy dependency to raw_params to ensure gradients propagate
+        return measured_tensor + (self.raw_params.sum() * 0.0)
