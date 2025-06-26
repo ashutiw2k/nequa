@@ -10,6 +10,9 @@ from .pqc_circuits import qiskit_PQC_RZRX
 from models.noise_models import BitPhaseFlipNoise
 
 def append_pqc_to_quantum_circuit(circuit:QuantumCircuit, params: torch.Tensor, pqc_func=qiskit_PQC_RZRX):
+    # # First, bound the parameters between -pi and pi
+    # bounded_params = torch.pi * torch.tanh(params)
+
     pqc_circ = pqc_func(circuit.num_qubits, params)
     # print(pqc_circ.draw())
     

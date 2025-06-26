@@ -112,8 +112,8 @@ class ScaledQiskitQuantumModel(nn.Module):
                  pqc_arch_func = qiskit_PQC_RZRX):
         super().__init__()
 
-        # 🔁 Raw (unconstrained) parameters initialized ~N(0, 1)
-        self.raw_params = nn.Parameter(torch.randn(num_params))  
+        # Raw (unconstrained) parameters initialized ~N(0, 1)
+        self.raw_params = nn.Parameter( torch.randn(num_params) )  
 
         # π scaling for tanh-based bounding to [-π, π]
         self.scale = torch.pi
