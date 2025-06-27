@@ -104,10 +104,9 @@ def run_circuit_sim(circuit: QuantumCircuit, simulator: AerSimulator, num_shots=
     )
 
 
-def get_ideal_data_superpos(num_qubits:int, num_shots:int=1024, num_vals:int=1000, prob_dist=False, device='CPU'):
+def get_ideal_data_superpos(num_qubits:int, num_shots:int=1024, num_vals:int=1000, prob_dist=False):
     ideal_data_list = []
     # num_qubits = circuit.num_qubits
-    ideal_sim = AerSimulator(device=device)
     
     for i in tqdm(range(num_vals), f'Generating Ideal Data'):
         params = (torch.rand((num_qubits, 2)) * torch.pi * 2).detach().cpu().numpy() # Get random values between 0 and 2pi
@@ -121,12 +120,12 @@ def get_ideal_data_superpos(num_qubits:int, num_shots:int=1024, num_vals:int=100
         # result = ideal_sim.run(transpiled_circ, shots=num_shots).result()
         # counts = result.get_counts(transpiled_circ)
         # full_counts = _fill_missing_bitstrings(counts, num_qubits)
-        counts = run_circuit_sampler(circ, num_shots)
+        counts = run_circuit_sampler(circ, num_shots, prob_dist)
         ideal_data_list.append((params, counts))
 
     return ideal_data_list
 
-def run_circuit_sampler(circuit:QuantumCircuit, shots=2**10):
+def run_circuit_sampler(circuit:QuantumCircuit, shots=2**10, prob_dist=False):
     """
     Run ``circuit`` with Terra’s default Sampler backend (falls back
     to pure-Python BasicAer if nothing faster is installed) and return
@@ -135,9 +134,12 @@ def run_circuit_sampler(circuit:QuantumCircuit, shots=2**10):
     job      = Sampler().run(circuit, shots=shots)   # no transpiler needed
     qdist    = job.result().quasi_dists[0]             # {bitstring:prob}
     num_qubits = circuit.num_qubits
+
     counts   = torch.tensor(
-        [round(qdist.get(i, 0) * shots)
+        [qdist.get(i, 0) * (1 if prob_dist else shots)
          for i in range(2**num_qubits)],
-        dtype=torch.int32,
     )
+
+    if not prob_dist:
+        counts = torch.round(counts).int()
     return counts

@@ -77,7 +77,7 @@ class SimpleQiskitQuantumModel(nn.Module):
                  circuit_runner = run_circuit_sampler, pqc_arch_func=qiskit_PQC_RZRX):
         super().__init__()
 
-        self.pqc_params = nn.Parameter(4*torch.pi + torch.pi*torch.rand(num_params)) # Convert parameters from [0,1) to [4\pi, 5\pi)
+        self.pqc_params = nn.Parameter(torch.zeros(num_params)) # Convert parameters from [0,1) to [4\pi, 5\pi)
         self.simulator = simulator
         self.transpile = transpile
         self.num_shots = num_shots
@@ -101,6 +101,35 @@ class SimpleQiskitQuantumModel(nn.Module):
         return measured_tensor + (self.pqc_params.sum() * 0.0) # The params.sum is for the required_grad=True error fix. 
 
 
+class SimpleParamQuantumModel(nn.Module):
+    def __init__(self, num_params:int, 
+                 simulator:AerSimulator, num_shots:int, 
+                 circuit_runner = run_circuit_sampler, pqc_arch_func=qiskit_PQC_RZRX):
+        super().__init__()
+
+        self.pqc_params = nn.Parameter(torch.rand(num_params) * torch.pi * 2) # Convert parameters from [0,1) to [4\pi, 5\pi)
+        self.simulator = simulator
+        self.transpile = transpile
+        self.num_shots = num_shots
+        self.runner = circuit_runner
+        self.pqc_arch_func = pqc_arch_func
+        self.scale = torch.pi
+        pass
+
+    
+    def forward(self):
+        """
+        @param circuit: The quantum circuit with the input and it's inverse appended. 
+        """    
+        # circ = circuit.remove_final_measurements(inplace=False)
+        # circuit_pqc = append_pqc_to_quantum_circuit(circuit=circ, 
+        #                                             params=self.pqc_params,
+        #                                             pqc_func=self.pqc_arch_func)
+        
+        # measured_tensor = self.runner(circuit_pqc, self.num_shots)
+
+        return self.pqc_params # The params.sum is for the required_grad=True error fix. 
+
 
 
         
@@ -114,7 +143,7 @@ class ScaledQiskitQuantumModel(nn.Module):
         super().__init__()
 
         # 🎯 Initialize wider: avoid tanh saturation or zero zone
-        self.raw_params = nn.Parameter(torch.randn(num_params) * 2.5)
+        self.raw_params = nn.Parameter(torch.zeros(num_params))
 
         self.scale = torch.tensor(torch.pi)  # Output in [-π, π]
         self.simulator = simulator

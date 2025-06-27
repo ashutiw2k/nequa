@@ -27,6 +27,18 @@ def qiskit_PQC_RZRX_unique(num_qubits:int, params:torch.Tensor):
 
     return pqc
 
+def qiskit_PQC_RZRXRZ_unique(num_qubits:int, params:torch.Tensor):
+    pqc = QuantumCircuit(num_qubits)
+    params = params.detach().numpy()
+    assert len(params) == 3*num_qubits, f"Length of parameter tensor is {len(params)}, expected 2."
+    # print(params)
+    for i in range(num_qubits):
+        pqc.rz(params[i*3], i)
+        pqc.rx(params[i*3 + 1], i)
+        pqc.rz(params[i*3 + 2], i)
+
+    return pqc
+
 def qiskit_PQC_RXRZ_unique(num_qubits:int, params:torch.Tensor):
     pqc = QuantumCircuit(num_qubits)
     params = params.detach().numpy()
@@ -71,5 +83,34 @@ def simple_PQC_pennylane(num_qubits:int, params:torch.Tensor):
         qml.RZ(params[0], i)
         qml.RX(params[1], i)
         # qml.RX(params[2], i)
+
+        
+def pennylane_PQC_RZRX_unique(num_qubits:int, params:torch.Tensor):
+    
+    assert len(params) == 2*num_qubits, f"Length of parameter tensor is {len(params)}, expected 2."
+    for i in range(num_qubits):
+        qml.RZ(params[2*i], i)
+        qml.RX(params[2*i + 1], i)
+
+        
+def pennylane_PQC_RZRXRY_unique(num_qubits:int, params:torch.Tensor):
+    
+    assert len(params) == 3*num_qubits, f"Length of parameter tensor is {len(params)}, expected 2."
+    for i in range(num_qubits):
+        qml.RZ(params[3*i], i)
+        qml.RX(params[3*i + 1], i)
+        qml.RY(params[3*i + 2], i)
+
+
+        
+def pennylane_PQC_RZRXRZ_unique(num_qubits:int, params:torch.Tensor):
+    
+    assert len(params) == 3*num_qubits, f"Length of parameter tensor is {len(params)}, expected 2."
+    for i in range(num_qubits):
+        qml.RZ(params[3*i], i)
+        qml.RX(params[3*i + 1], i)
+        qml.RZ(params[3*i + 2], i)
+        
+
 
         
