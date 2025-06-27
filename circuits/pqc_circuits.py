@@ -25,8 +25,19 @@ def qiskit_PQC_RZRX_unique(num_qubits:int, params:torch.Tensor):
         pqc.rz(params[i*2], i)
         pqc.rx(params[i*2 + 1], i)
 
+    return pqc
+
+def qiskit_PQC_RXRZ_unique(num_qubits:int, params:torch.Tensor):
+    pqc = QuantumCircuit(num_qubits)
+    params = params.detach().numpy()
+    assert len(params) == 2*num_qubits, f"Length of parameter tensor is {len(params)}, expected 2."
+    # print(params)
+    for i in range(num_qubits):
+        pqc.rx(params[i*2], i)
+        pqc.rz(params[i*2 + 1], i)
 
     return pqc
+
 
 def qiskit_PQC_RXRZ(num_qubits:int, params:torch.Tensor):
     pqc = QuantumCircuit(num_qubits)
