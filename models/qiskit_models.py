@@ -109,41 +109,51 @@ class ScaledQiskitQuantumModel(nn.Module):
                  simulator: AerSimulator, 
                  num_shots: int, 
                  circuit_runner = run_circuit_sampler, 
-                 pqc_arch_func = qiskit_PQC_RZRX):
+                 pqc_arch_func = qiskit_PQC_RZRX,
+                 use_regularization: bool = False):
         super().__init__()
 
-        # Raw (unconstrained) parameters initialized ~N(0, 1)
-        self.raw_params = nn.Parameter( torch.randn(num_params) )  
+        # 🎯 Initialize wider: avoid tanh saturation or zero zone
+        self.raw_params = nn.Parameter(torch.randn(num_params) * 2.5)
 
-        # π scaling for tanh-based bounding to [-π, π]
-        self.scale = torch.pi
-
-        # Standard circuit/simulator setup
+        self.scale = torch.tensor(torch.pi)  # Output in [-π, π]
         self.simulator = simulator
         self.transpile = transpile
         self.num_shots = num_shots
         self.runner = circuit_runner
         self.pqc_arch_func = pqc_arch_func
+        self.use_regularization = use_regularization
 
     def forward(self, circuit: QuantumCircuit = None):
         """
-        @param circuit: The quantum circuit with the input and its inverse appended. 
+        Returns measurements after PQC is appended to `circuit`.
         """
-        # ⚠️ Convert raw parameters to bounded range [-π, π]
-        bounded_params = self.scale * torch.tanh(self.raw_params)
+        # 🌀 Use sin-based reparam: periodic + non-zero gradients
+        bounded_params = self.scale * torch.sin(self.raw_params)
 
-        # Remove final measurements (assumed to be appended to input)
+        # Remove measurements from input circuit
         circ = circuit.remove_final_measurements(inplace=False)
 
-        # Append the PQC block with bounded parameters
+        # Append PQC using bounded params
         circuit_pqc = append_pqc_to_quantum_circuit(
-            circuit=circ, 
-            params=bounded_params, 
+            circuit=circ,
+            params=bounded_params,
             pqc_func=self.pqc_arch_func
         )
 
-        # Run on simulator and collect measurement counts
         measured_tensor = self.runner(circuit_pqc, self.num_shots)
 
-        # ⚠️ Add dummy dependency to raw_params to ensure gradients propagate
         return measured_tensor + (self.raw_params.sum() * 0.0)
+
+    def get_bounded_params(self):
+        """Returns bounded PQC parameters: θ = π · sin(x)"""
+        return self.scale * torch.sin(self.raw_params)
+
+    def regularization_loss(self, lam=0.01):
+        """
+        Optionally penalize near-zero angles (disable by default).
+        """
+        if not self.use_regularization:
+            return torch.tensor(0.0, device=self.raw_params.device)
+        bounded_params = self.get_bounded_params()
+        return lam * torch.norm(bounded_params, p=2)
