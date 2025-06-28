@@ -1,6 +1,7 @@
 from qiskit_aer.noise import NoiseModel
 from qiskit_aer.noise.errors import coherent_unitary_error
 from qiskit import QuantumCircuit
+from qiskit.circuit.library import RXGate, RZGate
 from qiskit.quantum_info import Operator
 import numpy as np
 
@@ -77,9 +78,32 @@ class BitPhaseFlipNoise:
         self.delta_x = delta_x * self.x_noise / 100.0
         self.delta_z = delta_z * self.z_noise / 100.0
 
+        self.x_noise_max = x_rad + self.delta_x
+        self.x_noise_min = x_rad - self.delta_x
+        self.z_noise_max = z_rad + self.delta_z
+        self.z_noise_min = z_rad - self.delta_z
+        
         # Use caller-supplied gate list or fall back to a default set
         self.noisy_gates = (
             noisy_gates
             if noisy_gates is not None
             else ["x", "h", "u1", "u2", "u3", "rx", "rz"]
         )
+
+    def add_noise(self, circuit:QuantumCircuit):
+        noisy_circ = QuantumCircuit(circuit.num_qubits)
+
+        for ins in circuit.data:
+            noisy_circ.append(ins)
+            if ins.label is None or 'noise' not in ins.label and ins.name in self.noisy_gates:
+                noisy_circ.append(RZGate(phi=np.random.uniform(low=self.z_noise_min, high=self.z_noise_max), label='z_noise'))
+                noisy_circ.append(RXGate(phi=np.random.uniform(low=self.x_noise_min, high=self.x_noise_max), label='x_noise'))
+
+        return noisy_circ
+    
+    def get_noisy_circuit_for_model(self, circuit:QuantumCircuit):
+        inv_circ = circuit.inverse()
+
+        return self.add_noise(circuit).compose(self.add_noise(inv_circ))
+
+
