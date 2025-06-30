@@ -90,3 +90,35 @@ class SimplePennyLaneQuantumModel(nn.Module):
         circuit_op = Operator(circuit)
         val = self.num_shots if self.prob_dist else 1
         return self.qnode(self.raw_params, circuit_op.data) * val
+    
+
+
+class SimplePennylaneQuantumStateModel(nn.Module):
+    def __init__(self, num_qubits, num_params, pqc_arch_func, 
+                 qdevice="default.qubit"):
+        
+        super(SimplePennylaneQuantumStateModel, self).__init__()
+
+        self.num_qubits = num_qubits
+        self.raw_params = nn.Parameter(torch.randn(num_params) * 2 * torch.pi)
+        self.pqc_arch = pqc_arch_func
+        
+        self.qml_device = qml.device(qdevice, wires=num_qubits)
+
+        @qml.qnode(self.qml_device, interface='torch', diff_method='backprop')
+        def circuit_sim(param_tensor, circuit_unitary:Operator):
+            # ⬇ Base circuit (e.g., noisy GHZ, etc.)
+            qml.QubitUnitary(circuit_unitary, wires=range(self.num_qubits))  # fixed input/inverse
+
+            # ⬇ Append parameterized PQC (θ = π·sin(x))
+            # bounded_params = torch.pi * torch.sin(param_tensor)
+            pqc_arch_func(num_qubits, param_tensor)
+
+            # ⬇ Measurement: return probabilities (or expectation values)
+            return qml.state()
+
+        self.qnode = circuit_sim
+    
+    def forward(self, circuit=QuantumCircuit):
+        circuit_op = Operator(circuit)
+        return self.qnode(self.raw_params, circuit_op.data)

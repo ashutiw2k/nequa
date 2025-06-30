@@ -2,6 +2,7 @@ import random
 import torch
 from qiskit import QuantumCircuit, transpile
 from qiskit.primitives import Sampler      # Terra ≥ 0.46
+from qiskit.quantum_info import Statevector
 
 from qiskit_aer import AerSimulator
 
@@ -104,7 +105,7 @@ def run_circuit_sim(circuit: QuantumCircuit, simulator: AerSimulator, num_shots=
     )
 
 
-def get_ideal_data_superpos(num_qubits:int, num_shots:int=1024, num_vals:int=1000, prob_dist=False):
+def get_ideal_data_superpos(num_qubits:int, num_shots:int=1024, num_vals:int=1000, prob_dist=False, statevector=False):
     ideal_data_list = []
     # num_qubits = circuit.num_qubits
     
@@ -114,14 +115,21 @@ def get_ideal_data_superpos(num_qubits:int, num_shots:int=1024, num_vals:int=100
         for i in range(num_qubits):
             circ.rx(params[i][0], i)
             circ.rz(params[i][1], i)
-        circ.measure_all()
+        
+        if statevector:
+            output_state = Statevector.from_instruction(circ)
+            state_tensor = torch.tensor(output_state.data)
+            ideal_data_list.append((params, state_tensor))
+        
+        else:
+            circ.measure_all()
 
         # transpiled_circ = transpile(circ, ideal_sim)
         # result = ideal_sim.run(transpiled_circ, shots=num_shots).result()
         # counts = result.get_counts(transpiled_circ)
         # full_counts = _fill_missing_bitstrings(counts, num_qubits)
-        counts = run_circuit_sampler(circ, num_shots, prob_dist)
-        ideal_data_list.append((params, counts))
+            counts = run_circuit_sampler(circ, num_shots, prob_dist)
+            ideal_data_list.append((params, counts))
 
     return ideal_data_list
 
