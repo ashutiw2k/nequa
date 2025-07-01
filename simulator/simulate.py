@@ -5,7 +5,7 @@ from qiskit.primitives import BaseEstimatorV1      # Terra ≥ 0.46
 from qiskit.quantum_info import Statevector
 
 from qiskit_aer import AerSimulator
-
+import pennylane as qml
 from tqdm import tqdm
 
 
@@ -103,6 +103,32 @@ def run_circuit_sim(circuit: QuantumCircuit, simulator: AerSimulator, num_shots=
     return torch.tensor(
         [x[1] for x in sorted(counts.items(), key=lambda x: x[0])]
     )
+
+
+def get_ideal_data_state(num_qubits:int, num_vals:int=1000):
+    ideal_data_list = []
+
+    # Analytic, shot-free device
+    dev = qml.device("default.qubit", wires=num_qubits, shots=None)
+    @qml.qnode(dev, diff_method=None)        # ← no grads tracked
+    def rx_rz_layer(param_matrix):
+        """|ψ⟩ produced by RX–RZ layer with per-qubit params (shape: [n,2])."""
+        for w in range(num_qubits):
+            qml.RX(param_matrix[w, 0], wires=w)
+            qml.RZ(param_matrix[w, 1], wires=w)
+        return qml.state()                   # big-endian ordering
+
+    for _ in tqdm(range(num_vals), desc="Generating Ideal Data"):
+        # Random angles in [0, 2π)
+        params = (torch.rand((num_qubits, 2)) * torch.pi * 2).detach().cpu().numpy()
+
+        # Evaluate circuit → NumPy array, then convert to Torch tensor
+        state_tensor = torch.tensor(rx_rz_layer(params))
+
+        ideal_data_list.append((params, state_tensor))
+
+    return ideal_data_list
+
 
 
 def get_ideal_data_superpos(num_qubits:int, num_shots:int=1024, num_vals:int=1000, prob_dist=False, statevector=False):

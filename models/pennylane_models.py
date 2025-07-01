@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import numpy as np
 from qiskit import QuantumCircuit, transpile
 from qiskit.quantum_info import Operator
 from qiskit_aer import AerSimulator
@@ -118,7 +119,19 @@ class SimplePennylaneQuantumStateModel(nn.Module):
             return qml.state()
 
         self.qnode = circuit_sim
-    
+        
+    def _qiskit_to_pl_matrix(self, U: np.ndarray, n: int) -> np.ndarray:
+        """
+        ChatGPT code snippet
+        Re-index little-endian unitary U to big-endian ordering."""
+        # Get indexing based on flipped endianness - 1 -> 001 becomes 100 -> 4, if n=3, etc. 
+        perm = [int(f"{i:0{n}b}"[::-1], 2) for i in range(2**n)] 
+        return U[np.ix_(perm, perm)]          # reorder rows and columns
+
     def forward(self, circuit=QuantumCircuit):
-        circuit_op = Operator(circuit)
-        return self.qnode(self.raw_params, circuit_op.data)
+        circuit_op = Operator(circuit).data
+        U_big    = torch.tensor(                    # → big-endian
+            self._qiskit_to_pl_matrix(circuit_op, self.num_qubits),
+            dtype=torch.complex128
+        )
+        return self.qnode(self.raw_params, U_big)
