@@ -1,7 +1,7 @@
 import random
 import torch
 from qiskit import QuantumCircuit, transpile
-from qiskit.primitives import Sampler      # Terra ≥ 0.46
+from qiskit.primitives import BaseEstimatorV1      # Terra ≥ 0.46
 from qiskit.quantum_info import Statevector
 
 from qiskit_aer import AerSimulator
@@ -139,13 +139,12 @@ def run_circuit_sampler(circuit:QuantumCircuit, shots=2**10, prob_dist=False):
     to pure-Python BasicAer if nothing faster is installed) and return
     a length-2**n tensor of shot counts.
     """
-    job      = Sampler().run(circuit, shots=shots)   # no transpiler needed
-    qdist    = job.result().quasi_dists[0]             # {bitstring:prob}
+    job      = AerSimulator().run(circuit, shots=shots)   # no transpiler needed
+    qdist    = job.result().get_counts()             # {bitstring:prob}
     num_qubits = circuit.num_qubits
 
     counts   = torch.tensor(
-        [qdist.get(i, 0) * (1 if prob_dist else shots)
-         for i in range(2**num_qubits)],
+        [qdist.get(i, 0) for i in range(2**num_qubits)],
     )
 
     if not prob_dist:

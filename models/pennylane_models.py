@@ -95,7 +95,7 @@ class SimplePennyLaneQuantumModel(nn.Module):
 
 class SimplePennylaneQuantumStateModel(nn.Module):
     def __init__(self, num_qubits, num_params, pqc_arch_func, 
-                 qdevice="default.qubit"):
+                 qdevice="default.qubit", diff='backprop', device=torch.device('cpu')):
         
         super(SimplePennylaneQuantumStateModel, self).__init__()
 
@@ -105,7 +105,7 @@ class SimplePennylaneQuantumStateModel(nn.Module):
         
         self.qml_device = qml.device(qdevice, wires=num_qubits)
 
-        @qml.qnode(self.qml_device, interface='torch', diff_method='backprop')
+        @qml.qnode(self.qml_device, interface='torch', diff_method=diff)
         def circuit_sim(param_tensor, circuit_unitary:Operator):
             # ⬇ Base circuit (e.g., noisy GHZ, etc.)
             qml.QubitUnitary(circuit_unitary, wires=range(self.num_qubits))  # fixed input/inverse
