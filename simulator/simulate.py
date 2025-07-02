@@ -180,7 +180,7 @@ def run_circuit_sampler(circuit:QuantumCircuit, shots=2**10, prob_dist=False):
     return counts
 
 
-def run_circuit_pennylane(circuit:QuantumCircuit, shots=2**10):
+def run_sampler_pennylane(circuit:QuantumCircuit, shots=2**10):
     
     num_qubits = circuit.num_qubits
 
@@ -202,4 +202,22 @@ def run_circuit_pennylane(circuit:QuantumCircuit, shots=2**10):
 
     return Counter(bitstrings)
 
+
+def run_state_pennylane(circuit:QuantumCircuit):
+    
+    num_qubits = circuit.num_qubits
+
+    dev = qml.device("default.qubit", wires=num_qubits, shots=None)
+
+    @qml.qnode(dev, interface="torch", diff_method=None)
+    def state_qnode(U_big):
+        # inject your Qiskit-built circuit (now re-indexed)
+        qml.QubitUnitary(U_big, wires=range(num_qubits))
+        # full-register sampling
+        return qml.state()
+        
+    circuit_op = Operator(circuit.remove_final_measurements(inplace=False)).data
+    perm = [int(f"{i:0{num_qubits}b}"[::-1], 2) for i in range(2**num_qubits)] 
+    circuit_op_pennylane =  circuit_op[np.ix_(perm, perm)] 
+    return state_qnode(circuit_op_pennylane)
 

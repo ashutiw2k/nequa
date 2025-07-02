@@ -36,7 +36,7 @@ def append_inverse(circuit:QuantumCircuit, add_measure=False):
     return circ
 
 
-def get_circuit_for_model(input:str, circuit:QuantumCircuit):
+def get_str_circuit_for_model(input:str, circuit:QuantumCircuit):
     """
     Returns a circuit with the input bitstring prefixed as a sequence of X gates, and the circuit's inverse appended. 
     """
@@ -52,7 +52,7 @@ def get_circuit_for_model(input:str, circuit:QuantumCircuit):
 
 
 def get_unitary_for_model_pennylane(input:str, circuit:QuantumCircuit):
-    qc = get_circuit_for_model(input, circuit)
+    qc = get_str_circuit_for_model(input, circuit)
     qc = qc.remove_final_measurements(inplace=False)
 
     model_circuit_unitary = quantum_info.Operator(qc).data
@@ -86,3 +86,18 @@ def append_custom_noisy_inverse(circuit:QuantumCircuit, noise:BitPhaseFlipNoise=
 
     return circuit.compose(inverse_circuit)
     
+def get_param_circuit_for_model(input:torch.Tensor, circuit:QuantumCircuit):
+    """
+    Returns a circuit with the input bitstring prefixed as a sequence of X gates, and the circuit's inverse appended. 
+    """
+    assert len(input) == circuit.num_qubits, f"The number of parameter rows in the input {input} do not equal the number of qubits {circuit.num_qubits}"
+    input_circ = QuantumCircuit(len(input))
+    for i,p in enumerate(input):
+        input_circ.rx(p[0], i)
+        input_circ.rz(p[1], i)
+        
+
+    model_circ = input_circ.compose(circuit)
+
+    return model_circ
+

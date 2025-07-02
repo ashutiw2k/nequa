@@ -96,8 +96,9 @@ class BitPhaseFlipNoise:
         for ins in circuit.data:
             noisy_circ.append(ins)
             if ins.label is None or 'noise' not in ins.label and ins.name in self.noisy_gates:
-                noisy_circ.append(RZGate(phi=np.random.uniform(low=self.z_noise_min, high=self.z_noise_max), label='z_noise'))
-                noisy_circ.append(RXGate(phi=np.random.uniform(low=self.x_noise_min, high=self.x_noise_max), label='x_noise'))
+                for q in ins.qubits:
+                    noisy_circ.append(RZGate(phi=np.random.uniform(low=self.z_noise_min, high=self.z_noise_max), label='z_noise'), [q])
+                    noisy_circ.append(RXGate(theta=np.random.uniform(low=self.x_noise_min, high=self.x_noise_max), label='x_noise'), [q])
 
         return noisy_circ
     
