@@ -2,12 +2,14 @@ import random
 import torch
 from qiskit import QuantumCircuit, transpile
 from qiskit.primitives import BaseEstimatorV1      # Terra ≥ 0.46
-from qiskit.quantum_info import Statevector
+from qiskit.quantum_info import Statevector, Operator
 
 from qiskit_aer import AerSimulator
 import pennylane as qml
 from tqdm import tqdm
+import numpy as np
 
+from collections import Counter
 
 def _fill_missing_bitstrings(data_dict, n_bits=None):
     """Return a dictionary containing all bitstrings of a given length.
@@ -176,3 +178,28 @@ def run_circuit_sampler(circuit:QuantumCircuit, shots=2**10, prob_dist=False):
     if not prob_dist:
         counts = torch.round(counts).int()
     return counts
+
+
+def run_circuit_pennylane(circuit:QuantumCircuit, shots=2**10):
+    
+    num_qubits = circuit.num_qubits
+
+    dev = qml.device("default.qubit", wires=num_qubits, shots=shots)
+
+    @qml.qnode(dev, interface="torch", diff_method=None)
+    def sample_qnode(U_big):
+        # inject your Qiskit-built circuit (now re-indexed)
+        qml.QubitUnitary(U_big, wires=range(num_qubits))
+        # full-register sampling
+        return qml.sample(wires=range(num_qubits))
+        
+    circuit_op = Operator(circuit.remove_final_measurements(inplace=False)).data
+    perm = [int(f"{i:0{num_qubits}b}"[::-1], 2) for i in range(2**num_qubits)] 
+    circuit_op_pennylane =  circuit_op[np.ix_(perm, perm)] 
+    samples = sample_qnode(circuit_op_pennylane)
+
+    bitstrings = ["".join(str(bit.item()) for bit in samp) for samp in samples]
+
+    return Counter(bitstrings)
+
+
