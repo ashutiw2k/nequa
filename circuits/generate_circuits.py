@@ -164,8 +164,11 @@ class GetGHZCircuitsForModel():
         return model_circ
 
 
-def generate_random_circuit(num_qubits: int, num_gates: int, gate_dist:dict=None):
+def generate_random_circuit(num_qubits: int, num_gates: int, gate_dist:dict=None, seed=None):
     circuit = QuantumCircuit(num_qubits)
+
+    if seed is not None:
+        random.seed(seed)
 
     if gate_dist is None:
         gate_dist = {gate:1/len(GATES) for gate in GATES}
@@ -180,8 +183,6 @@ def generate_random_circuit(num_qubits: int, num_gates: int, gate_dist:dict=None
         gate_q = QUBITS_FOR_GATES.get(gate)
         gate_f = GATES.get(gate)
         q = random.sample(population=range(num_qubits), k=gate_q)
-
-        print(gate, q)
 
         circuit.append(gate_f(), q)
 
