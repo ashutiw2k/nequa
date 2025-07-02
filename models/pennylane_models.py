@@ -106,10 +106,14 @@ class SimplePennylaneQuantumStateModel(nn.Module):
         
         self.qml_device = qml.device(qdevice, wires=num_qubits)
 
+        # Get indexing based on flipped endianness - 1 -> 001 becomes 100 -> 4, if n=3, etc. 
+        self.perm = [int(f"{i:0{num_qubits}b}"[::-1], 2) for i in range(2**num_qubits)] 
+
         @qml.qnode(self.qml_device, interface='torch', diff_method=diff)
         def circuit_sim(param_tensor, circuit_unitary:Operator):
             # ⬇ Base circuit (e.g., noisy GHZ, etc.)
-            qml.QubitUnitary(circuit_unitary, wires=range(self.num_qubits))  # fixed input/inverse
+            qml_unitary = circuit_unitary[np.ix_(self.perm, self.perm)]  # reorder rows and columns
+            qml.QubitUnitary(qml_unitary, wires=range(self.num_qubits))  # fixed input/inverse
 
             # ⬇ Append parameterized PQC (θ = π·sin(x))
             # bounded_params = torch.pi * torch.sin(param_tensor)
@@ -124,14 +128,10 @@ class SimplePennylaneQuantumStateModel(nn.Module):
         """
         ChatGPT code snippet
         Re-index little-endian unitary U to big-endian ordering."""
-        # Get indexing based on flipped endianness - 1 -> 001 becomes 100 -> 4, if n=3, etc. 
-        perm = [int(f"{i:0{n}b}"[::-1], 2) for i in range(2**n)] 
-        return U[np.ix_(perm, perm)]          # reorder rows and columns
+        
+        return         # reorder rows and columns
 
     def forward(self, circuit=QuantumCircuit):
         circuit_op = Operator(circuit).data
-        U_big    = torch.tensor(                    # → big-endian
-            self._qiskit_to_pl_matrix(circuit_op, self.num_qubits),
-            dtype=torch.complex128
-        )
-        return self.qnode(self.raw_params, U_big)
+
+        return self.qnode(self.raw_params, circuit_op)
