@@ -1,9 +1,14 @@
 from qiskit import QuantumCircuit
-from qiskit.circuit.library import RXGate, RZGate
+from qiskit.circuit.library import RXGate, RZGate, XGate, ZGate, HGate, CXGate, CZGate
 import numpy as np
+import random
 
 from models.noise_models import BitPhaseFlipNoise
 from .modify_circuits import append_inverse, append_custom_noisy_inverse
+
+GATES = {'x':XGate, 'h':HGate, 'z':ZGate, 'cx': CXGate, 'cz': CZGate}
+QUBITS_FOR_GATES = {'x':1, 'h':1, 'z':1, 'cx': 2, 'cz':2}
+
 
 def custom_ghz(num_q: int, hammard_on: int, single_qubit_cnot=True, add_measure=False):
     
@@ -157,3 +162,28 @@ class GetGHZCircuitsForModel():
         )
 
         return model_circ
+
+
+def generate_random_circuit(num_qubits: int, num_gates: int, gate_dist:dict=None, seed=None):
+    circuit = QuantumCircuit(num_qubits)
+
+    if seed is not None:
+        random.seed(seed)
+
+    if gate_dist is None:
+        gate_dist = {gate:1/len(GATES) for gate in GATES}
+
+    # print(gate_dist)
+    gates = random.choices(
+        population=list(gate_dist.keys()), 
+        weights=list(gate_dist.values()), 
+        k=num_gates)
+    
+    for gate in gates:
+        gate_q = QUBITS_FOR_GATES.get(gate)
+        gate_f = GATES.get(gate)
+        q = random.sample(population=range(num_qubits), k=gate_q)
+
+        circuit.append(gate_f(), q)
+
+    return circuit
