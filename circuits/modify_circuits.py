@@ -86,7 +86,7 @@ def append_custom_noisy_inverse(circuit:QuantumCircuit, noise:BitPhaseFlipNoise=
 
     return circuit.compose(inverse_circuit)
     
-def get_param_circuit_for_model(input:torch.Tensor, circuit:QuantumCircuit):
+def get_param_input_circuit(input:torch.Tensor, circuit:QuantumCircuit):
     """
     Returns a circuit with the input bitstring prefixed as a sequence of X gates, and the circuit's inverse appended. 
     """
@@ -101,3 +101,16 @@ def get_param_circuit_for_model(input:torch.Tensor, circuit:QuantumCircuit):
 
     return model_circ
 
+def get_str_input_circuit(input:str, circuit:QuantumCircuit):
+    """
+    Returns a circuit with the input bitstring prefixed as a sequence of X gates, and the circuit's inverse appended. 
+    """
+    assert len(input) == circuit.num_qubits, f"The number of bits in the input {input} do not equal the number of qubits {circuit.num_qubits}"
+    input_circ = QuantumCircuit(len(input))
+    for i,b in enumerate(input):
+        if b == '1':
+            input_circ.x(i)
+
+    model_circ = input_circ.compose(circuit)
+
+    return model_circ

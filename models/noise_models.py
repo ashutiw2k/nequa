@@ -84,11 +84,8 @@ class BitPhaseFlipNoise:
         self.z_noise_min = z_rad - self.delta_z
         
         # Use caller-supplied gate list or fall back to a default set
-        self.noisy_gates = (
-            noisy_gates
-            if noisy_gates is not None
-            else ["x", "h", "u1", "u2", "u3", "rx", "rz"]
-        )
+        if noisy_gates is None:
+            noisy_gates = ['x', 'y', 'z', 'h', 'cx', 'cz', 'rx', 'ry', 'rz']
 
     def add_noise(self, circuit:QuantumCircuit):
         noisy_circ = QuantumCircuit(circuit.num_qubits)
