@@ -1,0 +1,3 @@
+python3 scripts/fidelity_plot.py -q 5 -g 10 -p unique_u3 --gpu -o plots/tests  111.54s user 1.26s system 99% cpu 7 min total (adjoint default)
+python3 scripts/fidelity_plot.py -q 5 -g 10 -p unique_u3 --gpu -o plots/tests  111.36s user 0.81s system 99% cpu 1:52.81 total (backprop default)
+python3 scripts/fidelity_plot.py -q 8 -g 50 -p unique_u3 --gpu -o plots/tests  3795.48s user 49.02s system 99% cpu 1:04:11.12 total (backprop default)
