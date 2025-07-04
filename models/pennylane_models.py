@@ -135,3 +135,62 @@ class SimplePennylaneQuantumStateModel(nn.Module):
         circuit_op = Operator(circuit).data
 
         return self.qnode(self.raw_params, circuit_op)
+
+
+class SimplePennylaneQuantumStateModelGPU(nn.Module):
+    def __init__(
+        self,
+        num_qubits,
+        num_params,
+        pqc_arch_func,
+        qdevice="default.qubit",
+        diff_method='backprop',
+        device=torch.device('cpu')
+    ):
+        super().__init__()
+        self.num_qubits = num_qubits
+        self.device = device
+        # initialize raw params on the correct device
+        self.raw_params = nn.Parameter(
+            torch.randn(num_params, device=self.device) * 2 * torch.pi
+        )
+        self.pqc_arch = pqc_arch_func
+
+        # Choose a plugin that supports GPU if requested
+        if self.device.type == 'cuda':
+            plugin = 'lightning.qubit'  # requires pennylane-lightning
+        else:
+            plugin = qdevice
+        # Create the PennyLane device on CPU or GPU
+        self.qml_device = qml.device(plugin, wires=num_qubits, shots=None)
+
+        # Precompute flip permutation
+        self.perm = [int(f"{i:0{num_qubits}b}"[::-1], 2) for i in range(2**num_qubits)]
+
+        @qml.qnode(self.qml_device, interface='torch', diff_method=diff_method)
+        def circuit_sim(param_tensor, circuit_unitary):
+            # reorder the input state
+            qml.QubitUnitary(
+                circuit_unitary[np.ix_(self.perm, self.perm)],
+                wires=range(self.num_qubits)
+            )
+            # apply the parameterized PQC
+            pqc_arch_func(self.num_qubits, param_tensor)
+            # return statevector as complex64
+            return qml.state()
+
+        self.qnode = circuit_sim
+
+    def forward(self, circuit):
+        # Convert Qiskit circuit to a matrix and send to correct device
+        U = Operator(circuit).data
+        U = np.asarray(U, dtype=np.complex64)
+        # reorder
+        U_big = U[np.ix_(self.perm, self.perm)]
+        # to torch tensor on device
+        U_t = torch.tensor(U_big, dtype=torch.complex64, device=self.device)
+        # ensure raw_params on device
+        p = self.raw_params.to(self.device)
+        # execute QNode
+        state = self.qnode(p, U_t)
+        return state.to(self.device)

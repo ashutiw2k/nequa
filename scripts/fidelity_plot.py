@@ -18,7 +18,7 @@ from circuits.generate_circuits import generate_random_circuit
 from circuits.modify_circuits import get_param_input_circuit
 from simulator.simulate import run_sampler_pennylane, run_state_pennylane, get_ideal_data_state
 from models.noise_models import BitPhaseFlipNoise
-from models.pennylane_models import SimplePennylaneQuantumStateModel
+from models.pennylane_models import SimplePennylaneQuantumStateModel, SimplePennylaneQuantumStateModelGPU
 
 
 def load_config(path: str) -> dict:
@@ -150,13 +150,14 @@ def normalize_range(val, name: str):
 
 
 def train_model(pqc_model, ideal_data, epochs, optimizer, loss_fn, 
-                circuit, ):
+                circuit, device=torch.device('cpu')):
     param_list = []  # Stores parameter evolution across epochs
     loss_list_epoch = []
     enable_debug_logs = True  # Set False to suppress grad/param printouts
     lambda_reg = 0.01         # Regularization weight
 
     noise_model = BitPhaseFlipNoise()
+    pqc_model.to(device)
 
 
     for epoch in range(epochs):
@@ -173,7 +174,7 @@ def train_model(pqc_model, ideal_data, epochs, optimizer, loss_fn,
             model_circuit = get_param_input_circuit(params, noise_model.get_noisy_circuit_for_model(circuit))
             measured = pqc_model(circuit=model_circuit)
 
-            loss = loss_fn(ideal, measured)
+            loss = loss_fn(ideal.to(device), measured.to(device))
 
             # Add optional regularization to keep angles from zeroing out
 
@@ -203,20 +204,24 @@ def train_model(pqc_model, ideal_data, epochs, optimizer, loss_fn,
 
     return pqc_model
 
-def test_model(pqc_model, test_data, circuit):
+def test_model(pqc_model, test_data, circuit, device=torch.device('cpu')):
 
     noise_model = BitPhaseFlipNoise()
+    pqc_model.to(device)
     pqc_model.eval()
     loss_fn = QuantumFidelityLoss()
 
     fid_noisy = []
     fid_noisy_pqc = []
 
+    use_gpu = (device.type == 'cuda')
+
+
     for param, ideal in test_data:
         noisy_circ = get_param_input_circuit(param, noise_model.get_noisy_circuit_for_model(circuit=circuit))
         # noisy_circ_pqc = append_pqc_to_quantum_circuit(noisy_circ, pqc_params, qiskit_PQC_RZRXRZ_unique)
 
-        noi_out_st = run_state_pennylane(noisy_circ)
+        noi_out_st = run_state_pennylane(noisy_circ, use_gpu)
         npqc_out_st = pqc_model(noisy_circ)
         
         
@@ -243,10 +248,20 @@ def experiment_runner(num_qubits, num_gates, pqc_arch_dict, gate_dist,
     qiskit_pqc = pqc_arch_dict['qiskit']
     param_mult = pqc_arch_dict['mult']
 
-    pqc_model = SimplePennylaneQuantumStateModel(
-        num_qubits=num_qubits, num_params=param_mult*num_qubits, 
-        pqc_arch_func=pennylane_pqc, 
-    )
+
+    if device.type == 'cuda':
+
+        pqc_model = SimplePennylaneQuantumStateModelGPU(
+            num_qubits=num_qubits, num_params=param_mult*num_qubits, 
+            pqc_arch_func=pennylane_pqc, device=device
+        )
+
+    else: 
+        pqc_model = SimplePennylaneQuantumStateModel(
+            num_qubits=num_qubits, num_params=param_mult*num_qubits, 
+            pqc_arch_func=pennylane_pqc, 
+        )
+
     optimizer = torch.optim.AdamW(params=pqc_model.parameters(), 
                                   lr=lr)
     loss_fn = QuantumFidelityLoss()
@@ -266,7 +281,8 @@ def experiment_runner(num_qubits, num_gates, pqc_arch_dict, gate_dist,
         epochs=epochs,
         optimizer=optimizer,
         loss_fn=loss_fn,
-        circuit=random_circuit
+        circuit=random_circuit,
+        device = device
     )
 
     fid_list_noisy, fid_list_pqc = test_model(

@@ -180,46 +180,47 @@ def run_circuit_sampler(circuit:QuantumCircuit, shots=2**10, prob_dist=False):
     return counts
 
 
-def run_sampler_pennylane(circuit:QuantumCircuit, shots=2**10):
-    
+# Updated simulate.py with GPU support
+def run_sampler_pennylane(circuit, shots=1024, use_gpu=False):
+
     num_qubits = circuit.num_qubits
+    # pick plugin
+    plugin = 'lightning.qubit' if use_gpu else 'default.qubit'
+    dev = qml.device(plugin, wires=num_qubits, shots=shots)
 
-    dev = qml.device("default.qubit", wires=num_qubits, shots=shots)
-
-    @qml.qnode(dev, interface="torch", diff_method=None)
+    @qml.qnode(dev, interface='torch', diff_method=None)
     def sample_qnode(U_big):
-        # inject your Qiskit-built circuit (now re-indexed)
         qml.QubitUnitary(U_big, wires=range(num_qubits))
-        # full-register sampling
         return qml.sample(wires=range(num_qubits))
-        
-    circuit_op = Operator(circuit.remove_final_measurements(inplace=False)).data
-    perm = [int(f"{i:0{num_qubits}b}"[::-1], 2) for i in range(2**num_qubits)] 
-    circuit_op_pennylane =  circuit_op[np.ix_(perm, perm)] 
-    samples = sample_qnode(circuit_op_pennylane)
 
-    bitstrings = ["".join(str(bit.item()) for bit in samp) for samp in samples]
+    # get matrix, reorder, and send to correct device
+    U = Operator(circuit.remove_final_measurements(inplace=False)).data
+    perm = [int(f"{i:0{num_qubits}b}"[::-1], 2) for i in range(2**num_qubits)]
+    U_big = U[np.ix_(perm, perm)]
+    U_t = torch.tensor(U_big, dtype=torch.complex64, device='cuda' if use_gpu else 'cpu')
 
+    samples = sample_qnode(U_t)
+    bitstrings = ["".join(str(int(bit)) for bit in samp) for samp in samples]
     return Counter(bitstrings)
 
 
-def run_state_pennylane(circuit:QuantumCircuit):
-    """
-    Runs the circuit on pennylane's simulator (default.qubit)
-    """
+def run_state_pennylane(circuit, use_gpu=False):
+    import torch
+    import pennylane as qml
+    from qiskit.quantum_info import Operator
+
     num_qubits = circuit.num_qubits
+    plugin = 'lightning.qubit' if use_gpu else 'default.qubit'
+    dev = qml.device(plugin, wires=num_qubits, shots=None)
 
-    dev = qml.device("default.qubit", wires=num_qubits, shots=None)
-
-    @qml.qnode(dev, interface="torch", diff_method=None)
+    @qml.qnode(dev, interface='torch', diff_method=None)
     def state_qnode(U_big):
-        # inject your Qiskit-built circuit (now re-indexed)
         qml.QubitUnitary(U_big, wires=range(num_qubits))
-        # full-register sampling
         return qml.state()
-        
-    circuit_op = Operator(circuit.remove_final_measurements(inplace=False)).data
-    perm = [int(f"{i:0{num_qubits}b}"[::-1], 2) for i in range(2**num_qubits)] 
-    circuit_op_pennylane =  circuit_op[np.ix_(perm, perm)] 
-    return state_qnode(circuit_op_pennylane)
+
+    U = Operator(circuit.remove_final_measurements(inplace=False)).data
+    perm = [int(f"{i:0{num_qubits}b}"[::-1], 2) for i in range(2**num_qubits)]
+    U_big = U[np.ix_(perm, perm)]
+    U_t = torch.tensor(U_big, dtype=torch.complex64, device='cuda' if use_gpu else 'cpu')
+    return state_qnode(U_t)
 
