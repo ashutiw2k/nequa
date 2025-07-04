@@ -22,8 +22,13 @@ class QuantumFidelityLoss(nn.Module):
             if not torch.is_complex(measured):
                 raise ValueError("Measured input must be a complex-valued statevector")
 
-            fidelity = self.state_fidelity(psi=ideal, phi=measured)
-            return 1.0 - torch.real(fidelity)
+            if ideal.dim() > 1: 
+                fidelity = torch.stack([self.state_fidelity(psi, phi) for psi, phi in zip(ideal, measured)])
+            
+            else:
+                fidelity = self.state_fidelity(psi=ideal, phi=measured)
+
+            return 1.0 - torch.real(fidelity).mean()
 
         else:
             # Classical fidelity loss using counts or probs

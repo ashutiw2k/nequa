@@ -223,3 +223,20 @@ def run_state_pennylane(circuit:QuantumCircuit):
     circuit_op_pennylane =  circuit_op[np.ix_(perm, perm)] 
     return state_qnode(circuit_op_pennylane)
 
+
+def run_operator_pennylane(circuit_op:Operator, num_qubits:int):
+    """
+    Runs the circuit on pennylane's simulator (default.qubit)
+    """
+
+    dev = qml.device("default.qubit", wires=num_qubits, shots=None)
+
+    @qml.qnode(dev, interface="torch", diff_method=None)
+    def state_qnode(U_big):
+        # inject your Qiskit-built circuit (now re-indexed)
+        qml.QubitUnitary(U_big, wires=range(num_qubits))
+        # full-register sampling
+        return qml.state()
+        
+    return state_qnode(circuit_op).to(torch.complex128)
+

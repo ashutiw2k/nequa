@@ -117,3 +117,43 @@ class SimplePennylaneQuantumStateModel(nn.Module):
         circuit_op = Operator(circuit).data
 
         return self.qnode(self.raw_params, circuit_op)
+
+
+
+class SimplePennylaneUnitaryStateModel(nn.Module):
+    def __init__(self, num_qubits, num_params, pqc_arch_func, 
+                 qdevice="default.qubit", diff='backprop', device=torch.device('cpu')):
+        
+        super(SimplePennylaneUnitaryStateModel, self).__init__()
+
+        self.num_qubits = num_qubits
+        self.raw_params = nn.Parameter(torch.randn(num_params) * 2 * torch.pi)
+        self.pqc_arch = pqc_arch_func
+        
+        self.qml_device = qml.device(qdevice, wires=num_qubits)
+
+        # Get indexing based on flipped endianness - 1 -> 001 becomes 100 -> 4, if n=3, etc. 
+        # self.perm = [int(f"{i:0{num_qubits}b}"[::-1], 2) for i in range(2**num_qubits)] 
+
+        @qml.qnode(self.qml_device, interface='torch', diff_method=diff)
+        def circuit_sim(param_tensor, circuit_unitary:Operator):
+            # ⬇ Base circuit (e.g., noisy GHZ, etc.)
+            # qml_unitary = circuit_unitary[np.ix_(self.perm, self.perm)]  # reorder rows and columns
+            qml.QubitUnitary(circuit_unitary, wires=range(self.num_qubits))  # fixed input/inverse
+
+            # ⬇ Append parameterized PQC (θ = π·sin(x))
+            # bounded_params = torch.pi * torch.sin(param_tensor)
+            pqc_arch_func(num_qubits, param_tensor)
+
+            # ⬇ Measurement: return probabilities (or expectation values)
+            return qml.state()
+
+        self.qnode = circuit_sim
+        
+
+    def forward(self, circuit_op:torch.Tensor):
+
+        if circuit_op.dim() > 1:
+            return torch.stack([self.qnode(self.raw_params, U) for U in circuit_op]).to(torch.complex128)
+        else:
+            return self.qnode(self.raw_params, circuit_op).to(torch.complex128)

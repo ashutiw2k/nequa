@@ -11,6 +11,14 @@
             "program": "scripts/fidelity_plot.py",
             "console": "integratedTerminal",
             "args": "-q 5 -g 10 -p unique_rzrxrz --gpu -o plots/tests/ -l 0.001 --seed 42 --save_circuit"
+        }, 
+        {
+            "name": "Fast Fidelity Plotter",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/fidelity_plot_fast.py",
+            "console": "integratedTerminal",
+            "args": "-q 5 -g 10 -p unique_rzrxrz --gpu -o plots/tests/ -l 0.001 --seed 42 --save_circuit"
         }
     ]
 }
