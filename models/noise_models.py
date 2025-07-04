@@ -88,6 +88,10 @@ class BitPhaseFlipNoise:
             noisy_gates = ['x', 'y', 'z', 'h', 'cx', 'cz', 'rx', 'ry', 'rz']
 
     def add_noise(self, circuit:QuantumCircuit):
+        """
+        Adds the bit and phase flip noise to the circuit for the 
+        specified "noisy" gates. 
+        """
         noisy_circ = QuantumCircuit(circuit.num_qubits)
 
         for ins in circuit.data:
@@ -100,6 +104,9 @@ class BitPhaseFlipNoise:
         return noisy_circ
     
     def get_noisy_circuit_for_model(self, circuit:QuantumCircuit):
+        """
+        Returns a circuit with it's inverse appended, and noise (X and Z) added to the circuit. 
+        """
         inv_circ = circuit.inverse()
 
         return self.add_noise(circuit).compose(self.add_noise(inv_circ))

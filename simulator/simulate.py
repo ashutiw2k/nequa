@@ -204,7 +204,9 @@ def run_sampler_pennylane(circuit:QuantumCircuit, shots=2**10):
 
 
 def run_state_pennylane(circuit:QuantumCircuit):
-    
+    """
+    Runs the circuit on pennylane's simulator (default.qubit)
+    """
     num_qubits = circuit.num_qubits
 
     dev = qml.device("default.qubit", wires=num_qubits, shots=None)

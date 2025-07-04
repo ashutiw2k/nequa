@@ -22,12 +22,7 @@ class QuantumFidelityLoss(nn.Module):
             if not torch.is_complex(measured):
                 raise ValueError("Measured input must be a complex-valued statevector")
 
-            # Normalize just in case
-            psi = ideal / torch.linalg.norm(ideal)
-            phi = measured / torch.linalg.norm(measured)
-
-            overlap = torch.dot(torch.conj(psi), phi)
-            fidelity = torch.abs(overlap) ** 2
+            fidelity = self.state_fidelity(psi=ideal, phi=measured)
             return 1.0 - torch.real(fidelity)
 
         else:
@@ -39,3 +34,21 @@ class QuantumFidelityLoss(nn.Module):
 
             fidelity = torch.square(torch.sum(torch.sqrt(p * q)))
             return 1.0 - fidelity
+        
+    def state_fidelity(self, psi: torch.Tensor, phi: torch.Tensor) -> torch.Tensor:
+        """
+        Compute fidelity F = |⟨ψ|φ⟩|² between two normalized state vectors.
+
+        Args:
+            psi (torch.Tensor): Complex tensor of shape (2**n,) representing |ψ⟩
+            phi (torch.Tensor): Complex tensor of shape (2**n,) representing |φ⟩
+
+        Returns:
+            torch.Tensor: Real-valued scalar fidelity
+        """
+        # Optional: normalize if needed
+        psi = psi / torch.linalg.norm(psi)
+        phi = phi / torch.linalg.norm(phi)
+
+        overlap = torch.dot(torch.conj(psi), phi)
+        return torch.abs(overlap) ** 2

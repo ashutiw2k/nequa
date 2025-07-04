@@ -1,0 +1,16 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Fidelity Plotter",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/fidelity_plot.py",
+            "console": "integratedTerminal",
+            "args": "-q 5 -g 10 -p unique_rzrxrz --gpu -o plots/tests/ -l 0.001 --seed 42 --save_circuit"
+        }
+    ]
+}

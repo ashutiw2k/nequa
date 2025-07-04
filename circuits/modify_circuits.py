@@ -88,7 +88,7 @@ def append_custom_noisy_inverse(circuit:QuantumCircuit, noise:BitPhaseFlipNoise=
     
 def get_param_input_circuit(input:torch.Tensor, circuit:QuantumCircuit):
     """
-    Returns a circuit with the input bitstring prefixed as a sequence of X gates, and the circuit's inverse appended. 
+    Returns a circuit with the input parameters prefixed using RX-RZ gates
     """
     assert len(input) == circuit.num_qubits, f"The number of parameter rows in the input {input} do not equal the number of qubits {circuit.num_qubits}"
     input_circ = QuantumCircuit(len(input))
@@ -103,7 +103,7 @@ def get_param_input_circuit(input:torch.Tensor, circuit:QuantumCircuit):
 
 def get_str_input_circuit(input:str, circuit:QuantumCircuit):
     """
-    Returns a circuit with the input bitstring prefixed as a sequence of X gates, and the circuit's inverse appended. 
+    Returns a circuit with the input bitstring prefixed as a sequence of X gates. 
     """
     assert len(input) == circuit.num_qubits, f"The number of bits in the input {input} do not equal the number of qubits {circuit.num_qubits}"
     input_circ = QuantumCircuit(len(input))
